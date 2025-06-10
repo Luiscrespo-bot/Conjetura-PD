@@ -23,8 +23,6 @@ La herramienta en este repositorio permite visualizar este comportamiento, explo
 
 ## 🚀 Demo en línea
 
-Accede a la app sin instalar nada:  
-👉 [Streamlit Web App (pendiente de despliegue)](https://streamlit.io)
 
 ---
 
