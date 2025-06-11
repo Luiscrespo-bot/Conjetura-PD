@@ -3,10 +3,8 @@ import networkx as nx
 from itertools import permutations
 import plotly.graph_objects as go
 
-# Lista de nodos base por duplicación (potencias de 2)
 nodos_base = [1 << i for i in range(17)]
 
-# Colores personalizados para cada nodo
 colores_personalizados = {
     1: "#00ccff", 2: "#00e6cc", 4: "#00ffff", 8: "#009999",
     16: "#8000ff", 32: "#6600cc", 64: "#cc00cc", 128: "#ff66cc",
@@ -15,7 +13,6 @@ colores_personalizados = {
     32768: "#444444", 65536: "#000000"
 }
 
-# Funcion para obtener permutaciones válidas de un número
 def obtener_permutaciones(n):
     str_n = str(n)
     return sorted(
@@ -25,7 +22,6 @@ def obtener_permutaciones(n):
         )
     )
 
-# Mostrar controles
 st.set_page_config(layout="wide")
 st.title("Grafo Interactivo de Duplicación y Permutaciones hasta 65,536")
 
@@ -33,14 +29,12 @@ mostrar_permutaciones = st.checkbox("Mostrar permutaciones", value=True)
 
 nodo_filtro = st.multiselect(
     "Excluir permutaciones de los siguientes nodos:",
-    options=[n for n in nodos_base[3:]],
+    options=nodos_base[3:],
     default=[]
 )
 
-# Crear grafo dirigido
 G = nx.DiGraph()
 
-# Agregar nodos base y duplicaciones
 for i in range(len(nodos_base) - 1):
     n = nodos_base[i]
     dup = nodos_base[i + 1]
@@ -48,9 +42,8 @@ for i in range(len(nodos_base) - 1):
     G.add_node(dup, color=colores_personalizados[dup])
     G.add_edge(n, dup)
 
-# Agregar permutaciones si están activadas y no excluidas
 if mostrar_permutaciones:
-    for n in nodos_base[3:]:  # desde 8 en adelante
+    for n in nodos_base[3:]:
         if n in nodo_filtro:
             continue
         for p in obtener_permutaciones(n):
@@ -58,10 +51,8 @@ if mostrar_permutaciones:
                 G.add_node(p, color="#dddddd")
             G.add_edge(n, p)
 
-# Obtener posiciones con spring layout
 pos = nx.spring_layout(G, seed=42, k=0.5)
 
-# Convertir a formato para Plotly
 edge_x, edge_y = [], []
 for edge in G.edges():
     x0, y0 = pos[edge[0]]
@@ -93,7 +84,6 @@ node_trace = go.Scatter(
         size=20,
         line_width=2))
 
-# Mostrar grafo
 fig = go.Figure(data=[edge_trace, node_trace],
                 layout=go.Layout(
                     showlegend=False,
