@@ -1,76 +1,114 @@
 import streamlit as st
-import matplotlib.pyplot as plt
 import networkx as nx
 from itertools import permutations
+import plotly.graph_objects as go
 
-# Generar permutaciones válidas
-def permutaciones_validas(n):
+# Lista de nodos base por duplicación (potencias de 2)
+nodos_base = [1 << i for i in range(17)]
+
+# Colores personalizados para cada nodo
+colores_personalizados = {
+    1: "#00ccff", 2: "#00e6cc", 4: "#00ffff", 8: "#009999",
+    16: "#8000ff", 32: "#6600cc", 64: "#cc00cc", 128: "#ff66cc",
+    256: "#ff6666", 512: "#ff0000", 1024: "#ff3333", 2048: "#ffffff",
+    4096: "#cccccc", 8192: "#999999", 16384: "#666666",
+    32768: "#444444", 65536: "#000000"
+}
+
+# Funcion para obtener permutaciones válidas de un número
+def obtener_permutaciones(n):
     str_n = str(n)
-    perm_set = set()
-    for p in permutations(str_n):
-        if p[0] != '0':
-            perm = int(''.join(p))
-            if perm != n:
-                perm_set.add(perm)
-    return sorted(perm_set)
+    return sorted(
+        set(
+            int(''.join(p)) for p in permutations(str_n)
+            if p[0] != '0' and int(''.join(p)) != n
+        )
+    )
 
-# Crear el grafo
-def construir_grafo_pd(inicial, pasos=3):
-    G = nx.DiGraph()
-    actual = inicial
+# Mostrar controles
+st.set_page_config(layout="wide")
+st.title("Grafo Interactivo de Duplicación y Permutaciones hasta 65,536")
 
-    for _ in range(pasos):
-        duplicado = 2 * actual
-        perms = permutaciones_validas(actual)
-        G.add_node(actual, label=str(actual), tipo='base')
-        G.add_node(duplicado, label=str(duplicado), tipo='duplicado')
-        G.add_edge(actual, duplicado, tipo='duplicacion')
+mostrar_permutaciones = st.checkbox("Mostrar permutaciones", value=True)
 
-        for p in perms:
-            G.add_node(p, label=str(p), tipo='perm')
-            G.add_edge(actual, p, tipo='perm')
+nodo_filtro = st.multiselect(
+    "Excluir permutaciones de los siguientes nodos:",
+    options=[n for n in nodos_base[3:]],
+    default=[]
+)
 
-        actual = duplicado
+# Crear grafo dirigido
+G = nx.DiGraph()
 
-    return G
+# Agregar nodos base y duplicaciones
+for i in range(len(nodos_base) - 1):
+    n = nodos_base[i]
+    dup = nodos_base[i + 1]
+    G.add_node(n, color=colores_personalizados[n])
+    G.add_node(dup, color=colores_personalizados[dup])
+    G.add_edge(n, dup)
 
-# Dibujar grafo
-def dibujar_grafo(G):
-    pos = nx.spring_layout(G, seed=42)
-    fig, ax = plt.subplots(figsize=(12, 8))
+# Agregar permutaciones si están activadas y no excluidas
+if mostrar_permutaciones:
+    for n in nodos_base[3:]:  # desde 8 en adelante
+        if n in nodo_filtro:
+            continue
+        for p in obtener_permutaciones(n):
+            if p not in G:
+                G.add_node(p, color="#dddddd")
+            G.add_edge(n, p)
 
-    nodos_base = [n for n, attr in G.nodes(data=True) if attr['tipo'] == 'base']
-    nodos_duplicado = [n for n, attr in G.nodes(data=True) if attr['tipo'] == 'duplicado']
-    nodos_perm = [n for n, attr in G.nodes(data=True) if attr['tipo'] == 'perm']
+# Obtener posiciones con spring layout
+pos = nx.spring_layout(G, seed=42, k=0.5)
 
-    nx.draw_networkx_nodes(G, pos, nodelist=nodos_base, node_color='skyblue', node_size=800, label='Base')
-    nx.draw_networkx_nodes(G, pos, nodelist=nodos_duplicado, node_color='lightgreen', node_size=800, label='Duplicado')
-    nx.draw_networkx_nodes(G, pos, nodelist=nodos_perm, node_color='lightcoral', node_size=300, label='Permutaciones')
+# Convertir a formato para Plotly
+edge_x, edge_y = [], []
+for edge in G.edges():
+    x0, y0 = pos[edge[0]]
+    x1, y1 = pos[edge[1]]
+    edge_x += [x0, x1, None]
+    edge_y += [y0, y1, None]
 
-    edges_perm = [(u, v) for u, v, d in G.edges(data=True) if d['tipo'] == 'perm']
-    edges_dupl = [(u, v) for u, v, d in G.edges(data=True) if d['tipo'] == 'duplicacion']
+edge_trace = go.Scatter(
+    x=edge_x, y=edge_y,
+    line=dict(width=0.5, color='#888'),
+    hoverinfo='none', mode='lines')
 
-    nx.draw_networkx_edges(G, pos, edgelist=edges_perm, edge_color='red', style='dotted')
-    nx.draw_networkx_edges(G, pos, edgelist=edges_dupl, edge_color='green', width=2)
+node_x, node_y, node_text, node_color = [], [], [], []
+for node in G.nodes():
+    x, y = pos[node]
+    node_x.append(x)
+    node_y.append(y)
+    node_text.append(str(node))
+    node_color.append(G.nodes[node].get('color', '#dddddd'))
 
-    labels = {n: G.nodes[n]['label'] for n in G.nodes}
-    nx.draw_networkx_labels(G, pos, labels, font_size=10, font_weight='bold')
+node_trace = go.Scatter(
+    x=node_x, y=node_y,
+    mode='markers+text',
+    text=node_text, textposition='top center',
+    hoverinfo='text',
+    marker=dict(
+        showscale=False,
+        color=node_color,
+        size=20,
+        line_width=2))
 
-    ax.set_title("Visualización de la Conjetura PD", fontsize=16)
-    ax.axis('off')
-    return fig
+# Mostrar grafo
+fig = go.Figure(data=[edge_trace, node_trace],
+                layout=go.Layout(
+                    showlegend=False,
+                    hovermode='closest',
+                    margin=dict(b=20, l=5, r=5, t=40),
+                    xaxis=dict(showgrid=False, zeroline=False),
+                    yaxis=dict(showgrid=False, zeroline=False),
+                    height=800,
+                    dragmode='pan'
+                ))
 
-# Streamlit UI
-st.title("🔢 Conjetura PD (Permutación-Duplicación)")
-st.markdown("Explora cómo los números se reflejan en sus propias permutaciones mientras se duplican.")
+st.plotly_chart(fig, use_container_width=True)
 
-inicial = st.number_input("Número inicial (mínimo 2 dígitos):", min_value=10, value=128)
-pasos = st.slider("Pasos de duplicación:", min_value=1, max_value=5, value=3)
-
-if st.button("Generar grafo"):
-    with st.spinner("Construyendo..."):
-        G = construir_grafo_pd(inicial, pasos)
-        fig = dibujar_grafo(G)
-        st.pyplot(fig)
-
-    st.success("¡Grafo generado!")
+st.markdown("""
+**Controles:**
+- 🔍 Usa la **rueda del ratón** o las herramientas de zoom de Plotly.
+- 🔄 Usa `Ctrl + R` para refrescar el navegador si deseas reiniciar el grafo.
+""")
